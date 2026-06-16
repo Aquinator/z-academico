@@ -1,6 +1,6 @@
 # Plataforma Acadêmica — DevOps Microsserviços
 
-Projeto final de Engenharia da Computação. Plataforma escalável de gerenciamento acadêmico construída com arquitetura de microsserviços, CI/CD automatizado via GitHub Actions e observabilidade com Prometheus + Grafana.
+Projeto final de Engenharia de Software. Plataforma escalável de gerenciamento acadêmico construída com arquitetura de microsserviços, CI/CD automatizado via GitHub Actions e observabilidade com Prometheus + Grafana.
 
 ---
 
@@ -134,9 +134,3 @@ plataforma/
 - **Git Flow** como estratégia de branches: permite rastreabilidade clara por sprint e PR obrigatório
 - **Render** para deploy: suporte nativo a Docker, plano gratuito com auto-deploy via webhook
 
-## Equipe
-
-| Dev | GitHub |
-|---|---|
-| Dev 1 (auth-service, CI/CD) | @dev1 |
-| Dev 2 (academic-service, observabilidade) | @dev2 |
