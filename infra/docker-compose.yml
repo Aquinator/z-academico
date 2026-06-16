@@ -1,0 +1,198 @@
+version: "3.9"
+
+# ─── Redes ────────────────────────────────────────────────────
+networks:
+  gateway-net:
+    driver: bridge
+  auth-net:
+    driver: bridge
+  academic-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+# ─── Volumes ──────────────────────────────────────────────────
+volumes:
+  auth-db-data:
+  academic-db-data:
+  prometheus-data:
+  grafana-data:
+
+# ─── Serviços ─────────────────────────────────────────────────
+services:
+
+  # ── Banco de dados do auth-service ──────────────────────────
+  auth-db:
+    image: postgres:16-alpine
+    container_name: auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-change_me_auth}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - auth-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER:-auth_user} -d ${AUTH_DB_NAME:-auth_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Banco de dados do academic-service ──────────────────────
+  academic-db:
+    image: postgres:16-alpine
+    container_name: academic-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ACADEMIC_DB_NAME:-academic_db}
+      POSTGRES_USER: ${ACADEMIC_DB_USER:-academic_user}
+      POSTGRES_PASSWORD: ${ACADEMIC_DB_PASSWORD:-change_me_academic}
+    volumes:
+      - academic-db-data:/var/lib/postgresql/data
+    networks:
+      - academic-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ACADEMIC_DB_USER:-academic_user} -d ${ACADEMIC_DB_NAME:-academic_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Auth Service ─────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: auth-service
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${AUTH_PORT:-3001}
+      DB_HOST: auth-db
+      DB_PORT: 5432
+      DB_NAME: ${AUTH_DB_NAME:-auth_db}
+      DB_USER: ${AUTH_DB_USER:-auth_user}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:-change_me_auth}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    ports:
+      - "${AUTH_PORT:-3001}:3001"
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks:
+      - auth-net
+      - gateway-net
+      - monitoring-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - ../services/auth-service:/app
+      - /app/node_modules
+
+  # ── Academic Service ─────────────────────────────────────────
+  academic-service:
+    build:
+      context: ../services/academic-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: academic-service
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${ACADEMIC_PORT:-3002}
+      DB_HOST: academic-db
+      DB_PORT: 5432
+      DB_NAME: ${ACADEMIC_DB_NAME:-academic_db}
+      DB_USER: ${ACADEMIC_DB_USER:-academic_user}
+      DB_PASSWORD: ${ACADEMIC_DB_PASSWORD:-change_me_academic}
+      AUTH_SERVICE_URL: http://auth-service:3001
+    ports:
+      - "${ACADEMIC_PORT:-3002}:3002"
+    depends_on:
+      academic-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - academic-net
+      - gateway-net
+      - monitoring-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - ../services/academic-service:/app
+      - /app/node_modules
+
+  # ── Gateway (Nginx) ──────────────────────────────────────────
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    depends_on:
+      - auth-service
+      - academic-service
+    networks:
+      - gateway-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Prometheus ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Grafana ──────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-net
