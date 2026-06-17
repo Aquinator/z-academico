@@ -1,6 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 
+// ── Importação das Rotas ───────────────────────────────────
+const alunoRoutes      = require('./routes/alunoRoutes');
+const disciplinaRoutes = require('./routes/disciplinaRoutes');
+const turmaRoutes      = require('./routes/turmaRoutes');
+
 const app = express();
 
 app.use(cors());
@@ -16,11 +21,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ── TODO: Dev 2 implementa as rotas aqui ──────────────────
-// app.use('/alunos', alunoRoutes);
-// app.use('/turmas', turmaRoutes);
-// app.use('/disciplinas', disciplinaRoutes);
+// ── Registro das Rotas ─────────────────────────────────────
+app.use('/alunos',      alunoRoutes);
+app.use('/disciplinas', disciplinaRoutes);
+app.use('/turmas',      turmaRoutes);
 
+// ── Handler de Rota Não Encontrada (404) ───────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Rota não encontrada' });
 });
