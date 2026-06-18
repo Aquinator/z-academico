@@ -1,17 +1,16 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
-
-// ── Importação das Rotas ───────────────────────────────────
-const alunoRoutes      = require('./routes/alunoRoutes');
+const { register, metricsMiddleware } = require('./utils/metrics');
+const alunoRoutes = require('./routes/alunoRoutes');
 const disciplinaRoutes = require('./routes/disciplinaRoutes');
-const turmaRoutes      = require('./routes/turmaRoutes');
+const turmaRoutes = require('./routes/turmaRoutes');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(metricsMiddleware);
 
-// ── Health Check ───────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -21,14 +20,21 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ── Registro das Rotas ─────────────────────────────────────
-app.use('/alunos',      alunoRoutes);
-app.use('/disciplinas', disciplinaRoutes);
-app.use('/turmas',      turmaRoutes);
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end();
+  }
+});
 
-// ── Handler de Rota Não Encontrada (404) ───────────────────
+app.use('/alunos', alunoRoutes);
+app.use('/disciplinas', disciplinaRoutes);
+app.use('/turmas', turmaRoutes);
+
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Rota não encontrada' });
+  res.status(404).json({ success: false, message: 'Rota nao encontrada' });
 });
 
 module.exports = app;
