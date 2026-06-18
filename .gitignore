@@ -11,6 +11,7 @@ venv/
 .env.local
 .env.*.local
 !.env.example
+infra/.env
 
 # Build outputs
 dist/
