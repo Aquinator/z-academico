@@ -11,6 +11,7 @@ async function bootstrap() {
     await createTables();
 
     app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
       console.log(JSON.stringify({
         level: 'info',
         service: 'academic-service',
@@ -19,6 +20,7 @@ async function bootstrap() {
       }));
     });
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error(JSON.stringify({
       level: 'error',
       service: 'academic-service',
