@@ -134,3 +134,12 @@ plataforma/
 - **Git Flow** como estratégia de branches: permite rastreabilidade clara por sprint e PR obrigatório
 - **Render** para deploy: suporte nativo a Docker, plano gratuito com auto-deploy via webhook
 
+
+## Troubleshooting
+
+Encontrou algum problema ao subir o ambiente? Consulte o guia de troubleshooting com os 6 bugs documentados durante a validação do Sprint 2, incluindo causas raiz e soluções aplicadas:
+
+[docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
+
+Os problemas cobertos incluem: race condition entre Postgres e o serviço Node, hostname incorreto no `DATABASE_URL`, `proxy_pass` mal configurado no Nginx, dependência faltando no `package.json`, conflito de porta no host e `curl` ausente na imagem Alpine.
+
