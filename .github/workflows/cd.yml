@@ -95,32 +95,46 @@ jobs:
           git tag ${{ needs.version.outputs.tag }}
           git push origin ${{ needs.version.outputs.tag }}
 
-  # ── Deploy no Render ─────────────────────────────────────
+  # ── Deploy no Railway ─────────────────────────────────────
   deploy:
-    name: Deploy to Render
+    name: Deploy to Railway
     runs-on: ubuntu-latest
     needs: [version, build-push]
 
     steps:
-      - name: Deploy auth-service
-        run: |
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"serviceId":"${{ secrets.RENDER_AUTH_SERVICE_ID }}"}' \
-            https://api.render.com/v1/services/${{ secrets.RENDER_AUTH_SERVICE_ID }}/deploys
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Deploy academic-service
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Redeploy auth-service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service auth-service --yes
+
+      - name: Redeploy academic-service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service academic-service --yes
+
+      - name: Aguardar containers reiniciarem
+        run: sleep 25
+
+      - name: Health check pos-deploy — auth-service
         run: |
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"serviceId":"${{ secrets.RENDER_ACADEMIC_SERVICE_ID }}"}' \
-            https://api.render.com/v1/services/${{ secrets.RENDER_ACADEMIC_SERVICE_ID }}/deploys
+          curl -f --retry 5 --retry-delay 10 --retry-connrefused \
+            "${{ secrets.RAILWAY_AUTH_SERVICE_URL }}/health"
+
+      - name: Health check pos-deploy — academic-service
+        run: |
+          curl -f --retry 5 --retry-delay 10 --retry-connrefused \
+            "${{ secrets.RAILWAY_ACADEMIC_SERVICE_URL }}/health"
 
       - name: Summary
         run: |
-          echo "## Deploy concluído" >> $GITHUB_STEP_SUMMARY
-          echo "- Versão: ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Deploy concluido" >> $GITHUB_STEP_SUMMARY
+          echo "- Versao: ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- Imagens publicadas no Docker Hub" >> $GITHUB_STEP_SUMMARY
-          echo "- Deploy disparado no Render" >> $GITHUB_STEP_SUMMARY
+          echo "- Deploy disparado no Railway (auth-service e academic-service)" >> $GITHUB_STEP_SUMMARY
+          echo "- Health checks confirmados em ambos os servicos" >> $GITHUB_STEP_SUMMARY
