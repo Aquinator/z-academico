@@ -180,10 +180,11 @@ Push em feature/* ou develop → CI:
   ├── auditoria de segurança (npm audit)
   └── build Docker (verificação target=production)
 
-Merge em main → CD (Railway):
+Merge em main → CD:
   ├── build das imagens Docker
   ├── tag semântica automática
-  └── deploy automático no Railway
+  ├── push para Docker Hub
+  └── deploy automático (Render/Railway)
 ```
 
 ---
