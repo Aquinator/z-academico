@@ -26,13 +26,19 @@ jobs:
       - name: Generate tag
         id: tag
         run: |
-          # Busca a última tag ou começa em v0.0.0
-          LAST=$(git tag --sort=-version:refname | grep '^v' | head -n1 || echo "v0.0.0")
-          MAJOR=$(echo $LAST | cut -d. -f1 | tr -d 'v')
-          MINOR=$(echo $LAST | cut -d. -f2)
-          PATCH=$(echo $LAST | cut -d. -f3)
+          # Busca a última tag; se nao houver nenhuma, comeca em v0.0.0
+          LAST=$(git tag --sort=-version:refname | grep '^v' | head -n1)
+          if [ -z "$LAST" ]; then
+            LAST="v0.0.0"
+          fi
+
+          MAJOR=$(echo "$LAST" | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo "$LAST" | cut -d. -f2)
+          PATCH=$(echo "$LAST" | cut -d. -f3)
+
           NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "Tag anterior: $LAST"
           echo "Nova tag: $NEW_TAG"
 
   # ── Build e push das imagens ─────────────────────────────
@@ -107,6 +113,11 @@ jobs:
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
+
+      - name: Verificar autenticacao Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway whoami
 
       - name: Redeploy auth-service
         env:
