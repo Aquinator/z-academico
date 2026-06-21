@@ -1,7 +1,6 @@
-# z-academico — Plataforma Acadêmica de Microsserviços
+# Plataforma Acadêmica — DevOps Microsserviços
 
-Projeto final de Engenharia de Computação — IFCE Campus Fortaleza.
-Plataforma de gerenciamento acadêmico construída com arquitetura de microsserviços, CI/CD automatizado via GitHub Actions e observabilidade com Prometheus + Grafana.
+Projeto final de Engenharia de Software. Plataforma escalável de gerenciamento acadêmico construída com arquitetura de microsserviços, CI/CD automatizado via GitHub Actions e observabilidade com Prometheus + Grafana.
 
 ---
 
@@ -195,7 +194,6 @@ Merge em main → CD (Railway):
 main       ← produção, protegida, CD dispara aqui
 develop    ← integração, CI roda em todo push
 feature/*  ← desenvolvimento de features individuais
-hotfix/*   ← correções urgentes em produção
 ```
 
 **Convenção de commits:** [Conventional Commits](https://www.conventionalcommits.org/)
