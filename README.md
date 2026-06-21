@@ -7,96 +7,178 @@ Projeto final de Engenharia de Software. Plataforma escalável de gerenciamento 
 ## Arquitetura
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   Clientes                      │
-└────────────────────┬────────────────────────────┘
-                     │ HTTP
-              ┌──────▼───────┐
-              │   Gateway    │  :8080
-              │  (Nginx)     │
-              └──┬───────┬───┘
-                 │       │
-        ┌────────▼──┐ ┌──▼────────────┐
-        │auth-service│ │academic-service│
-        │  :3001     │ │    :3002       │
-        └────────┬───┘ └──┬────────────┘
-                 │        │
-        ┌────────▼──┐ ┌──▼────────────┐
-        │  DB auth  │ │  DB academic  │
-        │ (Postgres)│ │  (Postgres)   │
-        └───────────┘ └───────────────┘
+┌─────────────────────────────────────────────────────┐
+│                     Clientes                        │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTP
+                ┌──────▼───────┐
+                │   Gateway    │  :8080
+                │   (Nginx)    │
+                └──┬───────┬───┘
+                   │       │
+        ┌──────────▼──┐ ┌──▼──────────────┐
+        │ auth-service│ │academic-service  │
+        │   :3001     │ │    :3002         │
+        └──────────┬──┘ └──┬──────────────┘
+                   │       │
+        ┌──────────▼──┐ ┌──▼──────────────┐
+        │   auth-db   │ │   academic-db   │
+        │ (Postgres)  │ │  (Postgres)     │
+        └─────────────┘ └─────────────────┘
 
 Observabilidade:
-  Prometheus :9090 → coleta métricas de todos os serviços
-  Grafana    :3000 → dashboards
+  Prometheus :9090 ← coleta métricas de auth e academic
+  Grafana    :3000 ← dashboards em tempo real
 ```
 
-## Serviços
+### Serviços
 
 | Serviço | Porta | Responsabilidade |
 |---|---|---|
 | `auth-service` | 3001 | Registro, login, emissão e validação de JWT |
-| `academic-service` | 3002 | Alunos, turmas, disciplinas, matrículas |
-| `assignment-service` | 3003 | Atividades e entregas |
-| `gateway` | 8080 | Proxy reverso, roteamento |
+| `academic-service` | 3002 | Alunos, disciplinas, turmas e matrículas |
+| `gateway` | 8080 | Proxy reverso Nginx — roteamento entre serviços |
+| `prometheus` | 9090 | Coleta de métricas dos serviços |
+| `grafana` | 3000 | Visualização de métricas e dashboards |
+
+### Stack tecnológica
+
+| Camada | Tecnologia |
+|---|---|
+| Runtime | Node.js 20 LTS + Express 4 |
+| Banco de dados | PostgreSQL 16 Alpine (instância separada por serviço) |
+| Gateway | Nginx 1.25 Alpine |
+| Autenticação | JWT (jsonwebtoken) — stateless |
+| Métricas | prom-client 15 — Counter, Histogram, Gauge |
+| Logs | Winston — JSON estruturado com stack trace |
+| Observabilidade | Prometheus 2.51 + Grafana 10.4 |
+| CI/CD | GitHub Actions + Railway |
+| Containers | Docker + Docker Compose |
+
+---
+
+## Observabilidade
+
+### Prometheus
+
+O Prometheus coleta métricas dos dois serviços a cada 10 segundos via endpoint `/metrics` (formato padrão OpenMetrics).
+
+**Métricas expostas pelo `auth-service`:**
+- `auth_http_requests_total` — total de requisições por método, rota e status
+- `auth_http_request_duration_seconds` — latência das requisições (histograma)
+- `auth_login_attempts_total` — tentativas de login por resultado (`success` / `failure`)
+- `auth_registered_users_total` — total de usuários registrados (gauge)
+
+**Métricas expostas pelo `academic-service`:**
+- `academic_http_requests_total` — total de requisições por método, rota e status
+- `academic_http_request_duration_seconds` — latência das requisições (histograma)
+
+Para verificar os targets ativos:
+```
+http://localhost:9090/targets
+```
+Os três targets (`prometheus`, `auth-service`, `academic-service`) devem estar com status **UP**.
+
+### Grafana
+
+O dashboard **z-academico — Visão Geral** é provisionado automaticamente na inicialização e contém 6 painéis:
+
+| Painel | Tipo | Métrica |
+|---|---|---|
+| Requisições HTTP — auth-service | Time series | `rate(auth_http_requests_total[1m])` |
+| Latência p99 — auth-service | Time series | `histogram_quantile(0.99, ...)` |
+| Tentativas de Login | Stat | `auth_login_attempts_total` |
+| Usuários Registrados | Stat | `auth_registered_users_total` |
+| Requisições HTTP — academic-service | Time series | `rate(academic_http_requests_total[1m])` |
+| Latência p99 — academic-service | Time series | `histogram_quantile(0.99, ...)` |
+
+Acesso: `http://localhost:3000` — login `admin` / `admin`
+
+---
 
 ## Como rodar localmente
 
 ### Pré-requisitos
+
 - Docker >= 24
 - Docker Compose >= 2.20
+- Git
 
-### Subir o ambiente completo
+### 1. Clonar o repositório
 
 ```bash
-# Clone o repositório
-git clone https://github.com/<org>/plataforma.git
-cd plataforma
-
-# Copie e edite as variáveis de ambiente
-cp .env.example .env
-
-# Suba todos os containers
-docker compose up --build
+git clone https://github.com/<org>/z-academico.git
+cd z-academico
 ```
 
-### Serviços disponíveis após o boot
+### 2. Configurar variáveis de ambiente
+
+```bash
+cp .env.example .env
+# Editar .env com as senhas dos bancos e o JWT_SECRET
+```
+
+Variáveis obrigatórias:
+
+| Variável | Descrição |
+|---|---|
+| `AUTH_DB_USER` | Usuário do banco do auth-service |
+| `AUTH_DB_PASSWORD` | Senha do banco do auth-service |
+| `AUTH_DB_NAME` | Nome do banco do auth-service |
+| `ACADEMIC_DB_USER` | Usuário do banco do academic-service |
+| `ACADEMIC_DB_PASSWORD` | Senha do banco do academic-service |
+| `ACADEMIC_DB_NAME` | Nome do banco do academic-service |
+| `JWT_SECRET` | Chave secreta para assinatura dos tokens JWT |
+| `JWT_EXPIRES_IN` | Validade dos tokens (padrão: `7d`) |
+
+### 3. Subir o ambiente completo
+
+```bash
+cd infra
+docker compose up -d
+```
+
+> **Nota:** O healthcheck do gateway usa `127.0.0.1` (IPv4 explícito) em vez de `localhost` para evitar resolução via IPv6 em ambientes Alpine — garantindo que todos os containers fiquem `healthy` corretamente.
+
+### 4. Verificar status dos containers
+
+```bash
+docker compose ps
+```
+
+Todos os 7 containers devem aparecer com status `healthy`:
+
+```
+NAME               STATUS
+academic-db        Up (healthy)
+academic-service   Up (healthy)
+auth-db            Up (healthy)
+auth-service       Up (healthy)
+gateway            Up (healthy)
+grafana            Up (running)
+prometheus         Up (healthy)
+```
+
+### 5. Acessar os serviços
 
 | URL | Serviço |
 |---|---|
-| http://localhost:8080 | API Gateway |
-| http://localhost:3001/health | Auth Health |
-| http://localhost:3002/health | Academic Health |
-| http://localhost:9090 | Prometheus |
-| http://localhost:3000 | Grafana (admin/admin) |
+| http://localhost:8080 | API Gateway (ponto de entrada) |
+| http://localhost:3001/health | Auth Service — health direto |
+| http://localhost:3002/health | Academic Service — health direto |
+| http://localhost:9090/targets | Prometheus — targets ativos |
+| http://localhost:3000 | Grafana — dashboards (admin/admin) |
 
-## Estratégia de Branches (Git Flow)
-
-```
-main          ← produção, protegida, tags semânticas
-develop       ← integração, CI roda em todo push
-feature/*     ← features individuais, partem de develop
-release/*     ← preparação de release, merge em main + develop
-hotfix/*      ← correções urgentes em produção
-```
-
-**Convenção de commits:** [Conventional Commits](https://www.conventionalcommits.org/)
-```
-feat: adiciona endpoint de matrícula
-fix: corrige validação de token expirado
-docs: atualiza README com instruções de deploy
-ci: adiciona job de security check
-chore: atualiza dependências
-```
+---
 
 ## Pipeline CI/CD
 
 ```
-Push / PR → CI:
+Push em feature/* ou develop → CI:
   ├── lint (ESLint)
-  ├── testes unitários (Jest)
-  ├── análise de segurança (npm audit)
-  └── build Docker (verificação)
+  ├── testes unitários (Jest + cobertura)
+  ├── auditoria de segurança (npm audit)
+  └── build Docker (verificação target=production)
 
 Merge em main → CD:
   ├── build das imagens Docker
@@ -105,41 +187,82 @@ Merge em main → CD:
   └── deploy automático (Render/Railway)
 ```
 
+---
+
+## Estratégia de Branches (Git Flow)
+
+```
+main       ← produção, protegida, CD dispara aqui
+develop    ← integração, CI roda em todo push
+feature/*  ← desenvolvimento de features individuais
+```
+
+**Convenção de commits:** [Conventional Commits](https://www.conventionalcommits.org/)
+
+```
+feat: adiciona endpoint de matrícula
+fix: corrige validação de token expirado
+test: adiciona casos de teste para turmaController
+docs: atualiza README com seção de observabilidade
+ci: corrige job de build no GitHub Actions
+```
+
+---
+
 ## Estrutura do repositório
 
 ```
-plataforma/
+z-academico/
 ├── services/
-│   ├── auth-service/       # Autenticação e usuários
-│   ├── academic-service/   # Domínio acadêmico
-│   └── assignment-service/ # Atividades e entregas
-├── gateway/                # Nginx reverse proxy
+│   ├── auth-service/         # Autenticação e usuários
+│   │   ├── src/
+│   │   │   ├── controllers/
+│   │   │   ├── models/
+│   │   │   ├── routes/
+│   │   │   ├── middlewares/
+│   │   │   └── utils/        # logger.js, metrics.js, database.js
+│   │   ├── tests/
+│   │   └── Dockerfile
+│   └── academic-service/     # Domínio acadêmico
+│       ├── src/
+│       │   ├── controllers/  # aluno, disciplina, turma
+│       │   ├── models/
+│       │   ├── routes/
+│       │   ├── middlewares/
+│       │   └── utils/        # logger.js, metrics.js, database.js
+│       ├── tests/
+│       └── Dockerfile
+├── gateway/
+│   ├── nginx.conf            # Proxy reverso e roteamento
+│   └── Dockerfile
 ├── infra/
 │   ├── docker-compose.yml
 │   └── monitoring/
 │       ├── prometheus/
+│       │   └── prometheus.yml
 │       └── grafana/
-├── docs/                   # Documentação técnica e ADRs
+│           ├── provisioning/
+│           │   ├── datasources/prometheus.yml
+│           │   └── dashboards/default.yml
+│           └── dashboards/
+│               └── z-academico.json
+├── docs/
+│   ├── ADR.md                # Architecture Decision Records
+│   └── TROUBLESHOOTING.md   # Bugs conhecidos e soluções
 ├── .github/
-│   ├── workflows/          # GitHub Actions
-│   └── ISSUE_TEMPLATE/
+│   └── workflows/
+│       ├── ci.yml
+│       └── cd.yml
+├── .env.example
 └── README.md
 ```
 
-## Decisões Técnicas (ADR resumido)
-
-- **Node.js + Express** nos serviços: produtividade, ecossistema amplo e fácil containerização
-- **PostgreSQL** como banco relacional: suporte robusto a transações e tipos complexos
-- **JWT** para autenticação stateless: adequado para comunicação entre microsserviços
-- **Git Flow** como estratégia de branches: permite rastreabilidade clara por sprint e PR obrigatório
-- **Render** para deploy: suporte nativo a Docker, plano gratuito com auto-deploy via webhook
-
+---
 
 ## Troubleshooting
 
-Encontrou algum problema ao subir o ambiente? Consulte o guia de troubleshooting com os 6 bugs documentados durante a validação do Sprint 2, incluindo causas raiz e soluções aplicadas:
+Encontrou problemas ao subir o ambiente? Consulte o guia com os bugs documentados durante o desenvolvimento:
 
-[docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
+📄 [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
 
-Os problemas cobertos incluem: race condition entre Postgres e o serviço Node, hostname incorreto no `DATABASE_URL`, `proxy_pass` mal configurado no Nginx, dependência faltando no `package.json`, conflito de porta no host e `curl` ausente na imagem Alpine.
-
+Cobre: race condition Postgres × Node, hostname incorreto no `DATABASE_URL`, `proxy_pass` mal configurado no Nginx, dependência faltando no `package.json`, conflito de porta no host e healthcheck via IPv6 no Alpine.
