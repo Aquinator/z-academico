@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   REGISTRY: docker.io
   IMAGE_PREFIX: ${{ secrets.DOCKERHUB_USERNAME }}/z-academico
@@ -26,13 +29,19 @@ jobs:
       - name: Generate tag
         id: tag
         run: |
-          # Busca a última tag ou começa em v0.0.0
-          LAST=$(git tag --sort=-version:refname | grep '^v' | head -n1 || echo "v0.0.0")
-          MAJOR=$(echo $LAST | cut -d. -f1 | tr -d 'v')
-          MINOR=$(echo $LAST | cut -d. -f2)
-          PATCH=$(echo $LAST | cut -d. -f3)
+          # Busca a última tag; se nao houver nenhuma, comeca em v0.0.0
+          LAST=$(git tag --sort=-version:refname | grep '^v' | head -n1)
+          if [ -z "$LAST" ]; then
+            LAST="v0.0.0"
+          fi
+
+          MAJOR=$(echo "$LAST" | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo "$LAST" | cut -d. -f2)
+          PATCH=$(echo "$LAST" | cut -d. -f3)
+
           NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "Tag anterior: $LAST"
           echo "Nova tag: $NEW_TAG"
 
   # ── Build e push das imagens ─────────────────────────────
@@ -97,38 +106,28 @@ jobs:
 
   # ── Deploy no Railway ─────────────────────────────────────
   deploy:
-    name: Deploy to Railway
+    name: Verify deployment on Railway
     runs-on: ubuntu-latest
     needs: [version, build-push]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # O Railway está configurado para fazer redeploy automatico ao detectar
+      # uma nova imagem publicada no Docker Hub (watch tower / auto-deploy
+      # nativo do servico). Este job nao dispara o deploy via CLI — apenas
+      # aguarda e confirma que ele aconteceu, evitando a exigencia de
+      # verificacao de conta/pagamento do Project Token da Railway CLI.
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Redeploy auth-service
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway redeploy --service auth-service --yes
-
-      - name: Redeploy academic-service
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway redeploy --service academic-service --yes
-
-      - name: Aguardar containers reiniciarem
-        run: sleep 25
+      - name: Aguardar Railway detectar nova imagem e reiniciar
+        run: sleep 60
 
       - name: Health check pos-deploy — auth-service
         run: |
-          curl -f --retry 5 --retry-delay 10 --retry-connrefused \
+          curl -f --retry 8 --retry-delay 15 --retry-connrefused \
             "${{ secrets.RAILWAY_AUTH_SERVICE_URL }}/health"
 
       - name: Health check pos-deploy — academic-service
         run: |
-          curl -f --retry 5 --retry-delay 10 --retry-connrefused \
+          curl -f --retry 8 --retry-delay 15 --retry-connrefused \
             "${{ secrets.RAILWAY_ACADEMIC_SERVICE_URL }}/health"
 
       - name: Summary
