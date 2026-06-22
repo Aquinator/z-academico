@@ -237,24 +237,43 @@
 
   .toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
     padding: 12px 16px;
     border-bottom: 1px solid var(--line);
     gap: 12px;
   }
-  .toolbar form { display: flex; gap: 8px; flex: 1; }
-  .toolbar input {
-    flex: 1;
-    padding: 7px 10px;
+  .toolbar form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 1;
+  }
+  .toolbar form input,
+  .toolbar form select {
+    flex: 0 1 120px;
+    min-width: 90px;
+    max-width: 160px;
+    padding: 6px 8px;
     border: 1px solid var(--line);
     background: var(--paper);
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 11px;
   }
-  .toolbar button {
+  .toolbar form button {
+    flex: 0 0 auto;
     padding: 7px 12px;
     font-size: 11px;
+    align-self: flex-start;
+  }
+  .toolbar > #btn-refresh {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    font-size: 11px;
+    order: 0;
+    margin-left: auto;
   }
 
   footer {
@@ -311,7 +330,7 @@
   </div>
 
   <div class="session-bar" id="session-bar">
-    <span>Sessão como <span class="who" id="session-email"></span></span>
+    <span>Sessão como <span class="who" id="session-email"></span> · ID: <code id="session-uid" style="font-size:11px;"></code> <button class="ghost" id="btn-copy-uid" style="padding:2px 8px;font-size:10px;">copiar ID</button></span>
     <button class="ghost" id="btn-logout">Sair</button>
   </div>
 
@@ -354,6 +373,7 @@
   <div class="panel hidden" id="data-panel">
     <div class="tabs" style="padding: 0 16px;">
       <button class="tab-btn active" data-resource="alunos">Alunos</button>
+      <button class="tab-btn" data-resource="professores">Professores</button>
       <button class="tab-btn" data-resource="disciplinas">Disciplinas</button>
       <button class="tab-btn" data-resource="turmas">Turmas</button>
     </div>
@@ -379,11 +399,21 @@
     academicUrl: localStorage.getItem('z_academic_url') || '',
     token: sessionStorage.getItem('z_token') || null,
     email: sessionStorage.getItem('z_email') || null,
+    userId: sessionStorage.getItem('z_userid') || null,
     mode: 'login',
     resource: 'alunos',
   };
 
   const $ = (id) => document.getElementById(id);
+
+  function decodeJwtSub(token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload.sub || null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   function setDot(id, ok) {
     const dot = $(id);
@@ -433,6 +463,7 @@
     if (state.token) {
       $('session-bar').classList.add('show');
       $('session-email').textContent = state.email || '—';
+      $('session-uid').textContent = state.userId || 'desconhecido';
       $('auth-panel').classList.add('hidden');
       $('data-panel').classList.remove('hidden');
       loadResource(state.resource);
@@ -442,6 +473,16 @@
       $('data-panel').classList.add('hidden');
     }
   }
+
+  $('btn-copy-uid').addEventListener('click', function () {
+    if (!state.userId) return;
+    navigator.clipboard.writeText(state.userId).then(function () {
+      const btn = $('btn-copy-uid');
+      const original = btn.textContent;
+      btn.textContent = 'copiado!';
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    });
+  });
 
   $('btn-logout').addEventListener('click', function () {
     state.token = null;
@@ -511,8 +552,10 @@
       }
       state.token = json.data.token;
       state.email = json.data.user.email;
+      state.userId = json.data.user.id || decodeJwtSub(state.token);
       sessionStorage.setItem('z_token', state.token);
       sessionStorage.setItem('z_email', state.email);
+      sessionStorage.setItem('z_userid', state.userId || '');
       renderSession();
     } catch (e) {
       showMsg('auth-msg', 'Não foi possível contactar o auth-service. Verifique a URL configurada.', false);
@@ -521,17 +564,26 @@
 
   const RESOURCE_CONFIG = {
     alunos: {
-      columns: ['matricula', 'curso', 'usuario_id'],
-      labels: ['Matrícula', 'Curso', 'Usuário'],
+      columns: ['id', 'matricula', 'curso', 'usuario_id'],
+      labels: ['ID', 'Matrícula', 'Curso', 'Usuário'],
       addFields: [
         { key: 'usuarioId', label: 'ID do usuário', placeholder: 'uuid do auth-service' },
         { key: 'matricula', label: 'Matrícula', placeholder: '2026001' },
         { key: 'curso', label: 'Curso', placeholder: 'Engenharia da Computação' },
       ],
     },
+    professores: {
+      columns: ['id', 'siape', 'departamento', 'usuario_id'],
+      labels: ['ID', 'SIAPE', 'Departamento', 'Usuário'],
+      addFields: [
+        { key: 'usuarioId', label: 'ID do usuário', placeholder: 'uuid do auth-service' },
+        { key: 'siape', label: 'SIAPE', placeholder: '1234567' },
+        { key: 'departamento', label: 'Departamento', placeholder: 'Computação' },
+      ],
+    },
     disciplinas: {
-      columns: ['nome', 'codigo', 'carga_horaria'],
-      labels: ['Nome', 'Código', 'Carga horária'],
+      columns: ['id', 'nome', 'codigo', 'carga_horaria'],
+      labels: ['ID', 'Nome', 'Código', 'Carga horária'],
       addFields: [
         { key: 'nome', label: 'Nome', placeholder: 'Engenharia de Software' },
         { key: 'codigo', label: 'Código', placeholder: 'ENG101' },
@@ -539,11 +591,19 @@
       ],
     },
     turmas: {
-      columns: ['disciplina_nome', 'professor_siape', 'semestre', 'horario'],
-      labels: ['Disciplina', 'Professor (SIAPE)', 'Semestre', 'Horário'],
+      columns: ['id', 'disciplina_nome', 'professor_siape', 'semestre', 'horario'],
+      labels: ['ID', 'Disciplina', 'Professor (SIAPE)', 'Semestre', 'Horário'],
       addFields: [
-        { key: 'disciplinaId', label: 'ID disciplina', placeholder: 'uuid' },
-        { key: 'professorId', label: 'ID professor', placeholder: 'uuid' },
+        {
+          key: 'disciplinaId', label: 'Disciplina', type: 'select',
+          sourceResource: 'disciplinas',
+          optionLabel: (row) => row.nome + ' (' + row.codigo + ')',
+        },
+        {
+          key: 'professorId', label: 'Professor', type: 'select',
+          sourceResource: 'professores',
+          optionLabel: (row) => row.siape + ' — ' + row.departamento,
+        },
         { key: 'semestre', label: 'Semestre', placeholder: '2026.1' },
         { key: 'horario', label: 'Horário', placeholder: 'Seg/Qua 10h-12h' },
       ],
@@ -564,16 +624,84 @@
     loadResource(state.resource);
   });
 
-  function renderAddForm(resource) {
+  async function fetchResourceOptions(resource) {
+    if (!state.academicUrl) return [];
+    const base = state.academicUrl.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/' + resource, {
+        headers: { Authorization: 'Bearer ' + state.token },
+      });
+      const json = await res.json();
+      return (res.ok && json.success) ? (json.data || []) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function renderAddForm(resource) {
     const cfg = RESOURCE_CONFIG[resource];
     const form = $('quick-add-form');
+    form.innerHTML = '<span style="font-size:11px;color:var(--muted);">carregando formulário…</span>';
+
+    // Pre-carrega opções para campos do tipo select
+    const optionsCache = {};
+    for (const f of cfg.addFields) {
+      if (f.type === 'select') {
+        optionsCache[f.key] = await fetchResourceOptions(f.sourceResource);
+      }
+    }
+
     form.innerHTML = '';
     cfg.addFields.forEach((f) => {
-      const input = document.createElement('input');
-      input.placeholder = f.label + ' — ' + f.placeholder;
-      input.dataset.key = f.key;
-      form.appendChild(input);
+      if (f.type === 'select') {
+        const select = document.createElement('select');
+        select.dataset.key = f.key;
+        select.style.flex = '1';
+        select.style.padding = '7px 10px';
+        select.style.border = '1px solid var(--line)';
+        select.style.background = 'var(--paper)';
+        select.style.fontFamily = 'var(--mono)';
+        select.style.fontSize = '12px';
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = f.label + '…';
+        select.appendChild(placeholderOpt);
+
+        const opts = optionsCache[f.key] || [];
+        if (!opts.length) {
+          placeholderOpt.textContent = f.label + ' (nenhum cadastrado ainda)';
+        }
+        opts.forEach((row) => {
+          const opt = document.createElement('option');
+          opt.value = row.id;
+          opt.textContent = f.optionLabel(row);
+          select.appendChild(opt);
+        });
+        form.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.placeholder = f.label + ' — ' + (f.placeholder || '');
+        input.dataset.key = f.key;
+        form.appendChild(input);
+      }
     });
+
+    if (resource === 'alunos' || resource === 'professores') {
+      const useMyIdBtn = document.createElement('button');
+      useMyIdBtn.type = 'button';
+      useMyIdBtn.className = 'ghost';
+      useMyIdBtn.textContent = 'usar meu ID';
+      useMyIdBtn.style.fontSize = '11px';
+      useMyIdBtn.addEventListener('click', function () {
+        const usuarioIdInput = form.querySelector('[data-key="usuarioId"]');
+        if (usuarioIdInput && state.userId) {
+          usuarioIdInput.value = state.userId;
+        }
+      });
+      form.appendChild(useMyIdBtn);
+    }
+
     const submitBtn = document.createElement('button');
     submitBtn.type = 'submit';
     submitBtn.textContent = 'Adicionar';
@@ -582,8 +710,8 @@
     form.onsubmit = async function (ev) {
       ev.preventDefault();
       const payload = {};
-      form.querySelectorAll('input').forEach((inp) => {
-        payload[inp.dataset.key] = inp.value.trim();
+      form.querySelectorAll('input, select').forEach((inp) => {
+        payload[inp.dataset.key] = inp.value.trim ? inp.value.trim() : inp.value;
       });
       await createResource(resource, payload);
     };
@@ -613,7 +741,7 @@
   }
 
   async function loadResource(resource) {
-    renderAddForm(resource);
+    await renderAddForm(resource);
     const wrap = $('data-table-wrap');
     if (!state.academicUrl) {
       wrap.innerHTML = '<div class="empty-state">Configure a URL do academic-service acima.</div>';
@@ -650,12 +778,30 @@
       html += '<tr>';
       cfg.columns.forEach((col) => {
         const val = row[col] !== undefined && row[col] !== null ? String(row[col]) : '—';
-        html += '<td>' + escapeHtml(val) + '</td>';
+        if (col === 'id' || col === 'usuario_id') {
+          const short = val.length > 8 ? val.slice(0, 8) + '…' : val;
+          html += '<td><span class="id-copy" data-full="' + escapeHtml(val) + '" '
+            + 'style="cursor:pointer;border-bottom:1px dotted var(--muted);" '
+            + 'title="clique para copiar o ID completo">' + escapeHtml(short) + '</span></td>';
+        } else {
+          html += '<td>' + escapeHtml(val) + '</td>';
+        }
       });
       html += '</tr>';
     });
     html += '</tbody></table>';
     wrap.innerHTML = html;
+
+    wrap.querySelectorAll('.id-copy').forEach((el) => {
+      el.addEventListener('click', function () {
+        const full = el.dataset.full;
+        navigator.clipboard.writeText(full).then(function () {
+          const original = el.textContent;
+          el.textContent = 'copiado!';
+          setTimeout(() => { el.textContent = original; }, 1000);
+        });
+      });
+    });
   }
 
   function escapeHtml(str) {
