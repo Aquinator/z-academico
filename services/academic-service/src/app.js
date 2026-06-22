@@ -4,6 +4,7 @@ const { register, metricsMiddleware } = require('./utils/metrics');
 const alunoRoutes = require('./routes/alunoRoutes');
 const disciplinaRoutes = require('./routes/disciplinaRoutes');
 const turmaRoutes = require('./routes/turmaRoutes');
+const professorRoutes = require('./routes/professorRoutes');
 
 const app = express();
 
@@ -32,6 +33,8 @@ app.get('/metrics', async (req, res) => {
 app.use('/alunos', alunoRoutes);
 app.use('/disciplinas', disciplinaRoutes);
 app.use('/turmas', turmaRoutes);
+app.use('/professores', professorRoutes);
+
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Rota nao encontrada' });
