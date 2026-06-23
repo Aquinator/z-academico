@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>z-academico — Painel</title>
+<style>
+  :root {
+    --ink: #1a1d24;
+    --paper: #f7f5f0;
+    --line: #d8d4c8;
+    --accent: #2f5d50;
+    --accent-soft: #e4ede9;
+    --danger: #8c3a2b;
+    --danger-soft: #f3e4df;
+    --muted: #6b6a63;
+    --mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+    --serif: 'Source Serif Pro', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .shell {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  header.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+  }
+
+  header.top h1 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  header.top .sub {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .status-strip {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+
+  .status-cell {
+    background: var(--paper);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-cell .name {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--line);
+    flex-shrink: 0;
+    margin-right: 8px;
+    transition: background 0.2s;
+  }
+  .dot.ok { background: var(--accent); }
+  .dot.fail { background: var(--danger); }
+
+  .status-cell .label {
+    display: flex;
+    align-items: center;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    background: #fff;
+    margin-bottom: 24px;
+  }
+
+  .panel-head {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .panel-body { padding: 20px; }
+
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .field input:focus, .field select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .row { display: flex; gap: 12px; }
+  .row .field { flex: 1; }
+
+  button {
+    font-family: var(--mono);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 10px 18px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.8; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost {
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .msg {
+    margin-top: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    border-left: 3px solid var(--line);
+  }
+  .msg.ok { border-color: var(--accent); background: var(--accent-soft); }
+  .msg.err { border-color: var(--danger); background: var(--danger-soft); }
+
+  .session-bar {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    margin-bottom: 24px;
+    font-size: 13px;
+  }
+  .session-bar.show { display: flex; }
+  .session-bar .who { color: var(--accent); font-weight: 600; }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  .empty-state {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    gap: 12px;
+  }
+  .toolbar form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 1;
+  }
+  .toolbar form input,
+  .toolbar form select {
+    flex: 0 1 120px;
+    min-width: 90px;
+    max-width: 160px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .toolbar form button {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    font-size: 11px;
+    align-self: flex-start;
+  }
+  .toolbar > #btn-refresh {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    font-size: 11px;
+    order: 0;
+    margin-left: auto;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 40px;
+    letter-spacing: 0.04em;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header class="top">
+    <div>
+      <h1>z-academico</h1>
+      <div class="sub">painel de verificação — sprint 3</div>
+    </div>
+  </header>
+
+  <div class="status-strip">
+    <div class="status-cell">
+      <span class="name">auth-service</span>
+      <span class="label"><span class="dot" id="dot-auth"></span><span id="txt-auth">verificando</span></span>
+    </div>
+    <div class="status-cell">
+      <span class="name">academic-service</span>
+      <span class="label"><span class="dot" id="dot-academic"></span><span id="txt-academic">verificando</span></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span>Configuração</span>
+      <span id="config-saved-tag"></span>
+    </div>
+    <div class="panel-body">
+      <div class="row">
+        <div class="field">
+          <label for="cfg-auth-url">URL do auth-service</label>
+          <input id="cfg-auth-url" type="text" placeholder="https://auth-service-production-xxxx.up.railway.app">
+        </div>
+        <div class="field">
+          <label for="cfg-academic-url">URL do academic-service</label>
+          <input id="cfg-academic-url" type="text" placeholder="https://academic-service-production-xxxx.up.railway.app">
+        </div>
+      </div>
+      <button id="btn-save-config">Salvar e verificar</button>
+    </div>
+  </div>
+
+  <div class="session-bar" id="session-bar">
+    <span>Sessão como <span class="who" id="session-email"></span> · ID: <code id="session-uid" style="font-size:11px;"></code> <button class="ghost" id="btn-copy-uid" style="padding:2px 8px;font-size:10px;">copiar ID</button></span>
+    <button class="ghost" id="btn-logout">Sair</button>
+  </div>
+
+  <div class="panel" id="auth-panel">
+    <div class="panel-head">
+      <span>Acesso</span>
+    </div>
+    <div class="panel-body">
+      <div class="tabs">
+        <button class="tab-btn active" data-mode="login">Entrar</button>
+        <button class="tab-btn" data-mode="register">Criar conta</button>
+      </div>
+      <form id="auth-form" style="margin-top:18px;">
+        <div class="field hidden" id="field-nome">
+          <label for="in-nome">Nome</label>
+          <input id="in-nome" type="text" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="in-email">E-mail</label>
+          <input id="in-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="in-senha">Senha</label>
+          <input id="in-senha" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field hidden" id="field-tipo">
+          <label for="in-tipo">Tipo</label>
+          <select id="in-tipo">
+            <option value="aluno">aluno</option>
+            <option value="professor">professor</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <button type="submit" id="btn-auth-submit">Entrar</button>
+      </form>
+      <div id="auth-msg"></div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="data-panel">
+    <div class="tabs" style="padding: 0 16px;">
+      <button class="tab-btn active" data-resource="alunos">Alunos</button>
+      <button class="tab-btn" data-resource="professores">Professores</button>
+      <button class="tab-btn" data-resource="disciplinas">Disciplinas</button>
+      <button class="tab-btn" data-resource="turmas">Turmas</button>
+    </div>
+    <div class="toolbar">
+      <form id="quick-add-form"></form>
+      <button id="btn-refresh" class="ghost">Atualizar</button>
+    </div>
+    <div id="data-table-wrap">
+      <div class="empty-state">Carregando…</div>
+    </div>
+  </div>
+
+  <footer>auth-service + academic-service via gateway · painel estático, sem build step</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const state = {
+    authUrl: localStorage.getItem('z_auth_url') || '',
+    academicUrl: localStorage.getItem('z_academic_url') || '',
+    token: sessionStorage.getItem('z_token') || null,
+    email: sessionStorage.getItem('z_email') || null,
+    userId: sessionStorage.getItem('z_userid') || null,
+    mode: 'login',
+    resource: 'alunos',
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  function decodeJwtSub(token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload.sub || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setDot(id, ok) {
+    const dot = $(id);
+    dot.classList.remove('ok', 'fail');
+    dot.classList.add(ok ? 'ok' : 'fail');
+  }
+
+  async function pingHealth(url, dotId, txtId) {
+    if (!url) { $(txtId).textContent = 'sem url'; return; }
+    try {
+      const res = await fetch(url.replace(/\/$/, '') + '/health', { method: 'GET' });
+      if (res.ok) {
+        setDot(dotId, true);
+        $(txtId).textContent = 'online';
+      } else {
+        setDot(dotId, false);
+        $(txtId).textContent = 'erro ' + res.status;
+      }
+    } catch (e) {
+      setDot(dotId, false);
+      $(txtId).textContent = 'offline';
+    }
+  }
+
+  function refreshHealth() {
+    pingHealth(state.authUrl, 'dot-auth', 'txt-auth');
+    pingHealth(state.academicUrl, 'dot-academic', 'txt-academic');
+  }
+
+  $('cfg-auth-url').value = state.authUrl;
+  $('cfg-academic-url').value = state.academicUrl;
+
+  $('btn-save-config').addEventListener('click', function () {
+    state.authUrl = $('cfg-auth-url').value.trim();
+    state.academicUrl = $('cfg-academic-url').value.trim();
+    localStorage.setItem('z_auth_url', state.authUrl);
+    localStorage.setItem('z_academic_url', state.academicUrl);
+    $('config-saved-tag').textContent = 'salvo';
+    setTimeout(() => { $('config-saved-tag').textContent = ''; }, 1500);
+    refreshHealth();
+  });
+
+  refreshHealth();
+  setInterval(refreshHealth, 20000);
+
+  function renderSession() {
+    if (state.token) {
+      $('session-bar').classList.add('show');
+      $('session-email').textContent = state.email || '—';
+      $('session-uid').textContent = state.userId || 'desconhecido';
+      $('auth-panel').classList.add('hidden');
+      $('data-panel').classList.remove('hidden');
+      loadResource(state.resource);
+    } else {
+      $('session-bar').classList.remove('show');
+      $('auth-panel').classList.remove('hidden');
+      $('data-panel').classList.add('hidden');
+    }
+  }
+
+  $('btn-copy-uid').addEventListener('click', function () {
+    if (!state.userId) return;
+    navigator.clipboard.writeText(state.userId).then(function () {
+      const btn = $('btn-copy-uid');
+      const original = btn.textContent;
+      btn.textContent = 'copiado!';
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    });
+  });
+
+  $('btn-logout').addEventListener('click', function () {
+    state.token = null;
+    state.email = null;
+    sessionStorage.removeItem('z_token');
+    sessionStorage.removeItem('z_email');
+    renderSession();
+  });
+
+  const authTabs = document.querySelectorAll('#auth-panel .tab-btn');
+  authTabs.forEach((btn) => {
+    btn.addEventListener('click', function () {
+      authTabs.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.mode = btn.dataset.mode;
+      const isRegister = state.mode === 'register';
+      $('field-nome').classList.toggle('hidden', !isRegister);
+      $('field-tipo').classList.toggle('hidden', !isRegister);
+      $('btn-auth-submit').textContent = isRegister ? 'Criar conta' : 'Entrar';
+      $('auth-msg').innerHTML = '';
+    });
+  });
+
+  function showMsg(elId, text, ok) {
+    $(elId).innerHTML = '<div class="msg ' + (ok ? 'ok' : 'err') + '">' + text + '</div>';
+  }
+
+  $('auth-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    if (!state.authUrl) {
+      showMsg('auth-msg', 'Configure a URL do auth-service antes.', false);
+      return;
+    }
+    const email = $('in-email').value.trim();
+    const senha = $('in-senha').value;
+    const base = state.authUrl.replace(/\/$/, '');
+
+    try {
+      if (state.mode === 'register') {
+        const nome = $('in-nome').value.trim();
+        const tipo = $('in-tipo').value;
+        const res = await fetch(base + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, email, senha, tipo }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          showMsg('auth-msg', json.message || 'Erro ao criar conta.', false);
+          return;
+        }
+        showMsg('auth-msg', 'Conta criada. Agora entre com suas credenciais.', true);
+        authTabs[0].click();
+        $('in-senha').value = '';
+        return;
+      }
+
+      const res = await fetch(base + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showMsg('auth-msg', json.message || 'Credenciais inválidas.', false);
+        return;
+      }
+      state.token = json.data.token;
+      state.email = json.data.user.email;
+      state.userId = json.data.user.id || decodeJwtSub(state.token);
+      sessionStorage.setItem('z_token', state.token);
+      sessionStorage.setItem('z_email', state.email);
+      sessionStorage.setItem('z_userid', state.userId || '');
+      renderSession();
+    } catch (e) {
+      showMsg('auth-msg', 'Não foi possível contactar o auth-service. Verifique a URL configurada.', false);
+    }
+  });
+
+  const RESOURCE_CONFIG = {
+    alunos: {
+      columns: ['id', 'matricula', 'curso', 'usuario_id'],
+      labels: ['ID', 'Matrícula', 'Curso', 'Usuário'],
+      addFields: [
+        { key: 'usuarioId', label: 'ID do usuário', placeholder: 'uuid do auth-service' },
+        { key: 'matricula', label: 'Matrícula', placeholder: '2026001' },
+        { key: 'curso', label: 'Curso', placeholder: 'Engenharia da Computação' },
+      ],
+    },
+    professores: {
+      columns: ['id', 'siape', 'departamento', 'usuario_id'],
+      labels: ['ID', 'SIAPE', 'Departamento', 'Usuário'],
+      addFields: [
+        { key: 'usuarioId', label: 'ID do usuário', placeholder: 'uuid do auth-service' },
+        { key: 'siape', label: 'SIAPE', placeholder: '1234567' },
+        { key: 'departamento', label: 'Departamento', placeholder: 'Computação' },
+      ],
+    },
+    disciplinas: {
+      columns: ['id', 'nome', 'codigo', 'carga_horaria'],
+      labels: ['ID', 'Nome', 'Código', 'Carga horária'],
+      addFields: [
+        { key: 'nome', label: 'Nome', placeholder: 'Engenharia de Software' },
+        { key: 'codigo', label: 'Código', placeholder: 'ENG101' },
+        { key: 'cargaHoraria', label: 'Carga horária', placeholder: '60' },
+      ],
+    },
+    turmas: {
+      columns: ['id', 'disciplina_nome', 'professor_siape', 'semestre', 'horario'],
+      labels: ['ID', 'Disciplina', 'Professor (SIAPE)', 'Semestre', 'Horário'],
+      addFields: [
+        {
+          key: 'disciplinaId', label: 'Disciplina', type: 'select',
+          sourceResource: 'disciplinas',
+          optionLabel: (row) => row.nome + ' (' + row.codigo + ')',
+        },
+        {
+          key: 'professorId', label: 'Professor', type: 'select',
+          sourceResource: 'professores',
+          optionLabel: (row) => row.siape + ' — ' + row.departamento,
+        },
+        { key: 'semestre', label: 'Semestre', placeholder: '2026.1' },
+        { key: 'horario', label: 'Horário', placeholder: 'Seg/Qua 10h-12h' },
+      ],
+    },
+  };
+
+  const dataTabs = document.querySelectorAll('#data-panel .tab-btn');
+  dataTabs.forEach((btn) => {
+    btn.addEventListener('click', function () {
+      dataTabs.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.resource = btn.dataset.resource;
+      loadResource(state.resource);
+    });
+  });
+
+  $('btn-refresh').addEventListener('click', function () {
+    loadResource(state.resource);
+  });
+
+  async function fetchResourceOptions(resource) {
+    if (!state.academicUrl) return [];
+    const base = state.academicUrl.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/' + resource, {
+        headers: { Authorization: 'Bearer ' + state.token },
+      });
+      const json = await res.json();
+      return (res.ok && json.success) ? (json.data || []) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function renderAddForm(resource) {
+    const cfg = RESOURCE_CONFIG[resource];
+    const form = $('quick-add-form');
+    form.innerHTML = '<span style="font-size:11px;color:var(--muted);">carregando formulário…</span>';
+
+    // Pre-carrega opções para campos do tipo select
+    const optionsCache = {};
+    for (const f of cfg.addFields) {
+      if (f.type === 'select') {
+        optionsCache[f.key] = await fetchResourceOptions(f.sourceResource);
+      }
+    }
+
+    form.innerHTML = '';
+    cfg.addFields.forEach((f) => {
+      if (f.type === 'select') {
+        const select = document.createElement('select');
+        select.dataset.key = f.key;
+        select.style.flex = '1';
+        select.style.padding = '7px 10px';
+        select.style.border = '1px solid var(--line)';
+        select.style.background = 'var(--paper)';
+        select.style.fontFamily = 'var(--mono)';
+        select.style.fontSize = '12px';
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = f.label + '…';
+        select.appendChild(placeholderOpt);
+
+        const opts = optionsCache[f.key] || [];
+        if (!opts.length) {
+          placeholderOpt.textContent = f.label + ' (nenhum cadastrado ainda)';
+        }
+        opts.forEach((row) => {
+          const opt = document.createElement('option');
+          opt.value = row.id;
+          opt.textContent = f.optionLabel(row);
+          select.appendChild(opt);
+        });
+        form.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.placeholder = f.label + ' — ' + (f.placeholder || '');
+        input.dataset.key = f.key;
+        form.appendChild(input);
+      }
+    });
+
+    if (resource === 'alunos' || resource === 'professores') {
+      const useMyIdBtn = document.createElement('button');
+      useMyIdBtn.type = 'button';
+      useMyIdBtn.className = 'ghost';
+      useMyIdBtn.textContent = 'usar meu ID';
+      useMyIdBtn.style.fontSize = '11px';
+      useMyIdBtn.addEventListener('click', function () {
+        const usuarioIdInput = form.querySelector('[data-key="usuarioId"]');
+        if (usuarioIdInput && state.userId) {
+          usuarioIdInput.value = state.userId;
+        }
+      });
+      form.appendChild(useMyIdBtn);
+    }
+
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    submitBtn.textContent = 'Adicionar';
+    form.appendChild(submitBtn);
+
+    form.onsubmit = async function (ev) {
+      ev.preventDefault();
+      const payload = {};
+      form.querySelectorAll('input, select').forEach((inp) => {
+        payload[inp.dataset.key] = inp.value.trim ? inp.value.trim() : inp.value;
+      });
+      await createResource(resource, payload);
+    };
+  }
+
+  async function createResource(resource, payload) {
+    if (!state.academicUrl) return;
+    const base = state.academicUrl.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/' + resource, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + state.token,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        alert(json.message || 'Erro ao criar registro.');
+        return;
+      }
+      loadResource(resource);
+    } catch (e) {
+      alert('Não foi possível contactar o academic-service.');
+    }
+  }
+
+  async function loadResource(resource) {
+    await renderAddForm(resource);
+    const wrap = $('data-table-wrap');
+    if (!state.academicUrl) {
+      wrap.innerHTML = '<div class="empty-state">Configure a URL do academic-service acima.</div>';
+      return;
+    }
+    wrap.innerHTML = '<div class="empty-state">Carregando…</div>';
+    const base = state.academicUrl.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/' + resource, {
+        headers: { Authorization: 'Bearer ' + state.token },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        wrap.innerHTML = '<div class="empty-state">' + (json.message || 'Erro ao carregar dados.') + '</div>';
+        return;
+      }
+      renderTable(resource, json.data || []);
+    } catch (e) {
+      wrap.innerHTML = '<div class="empty-state">Não foi possível contactar o academic-service.</div>';
+    }
+  }
+
+  function renderTable(resource, rows) {
+    const cfg = RESOURCE_CONFIG[resource];
+    const wrap = $('data-table-wrap');
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="empty-state">Nenhum registro ainda. Use o formulário acima para adicionar.</div>';
+      return;
+    }
+    let html = '<table><thead><tr>';
+    cfg.labels.forEach((l) => { html += '<th>' + l + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach((row) => {
+      html += '<tr>';
+      cfg.columns.forEach((col) => {
+        const val = row[col] !== undefined && row[col] !== null ? String(row[col]) : '—';
+        if (col === 'id' || col === 'usuario_id') {
+          const short = val.length > 8 ? val.slice(0, 8) + '…' : val;
+          html += '<td><span class="id-copy" data-full="' + escapeHtml(val) + '" '
+            + 'style="cursor:pointer;border-bottom:1px dotted var(--muted);" '
+            + 'title="clique para copiar o ID completo">' + escapeHtml(short) + '</span></td>';
+        } else {
+          html += '<td>' + escapeHtml(val) + '</td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('.id-copy').forEach((el) => {
+      el.addEventListener('click', function () {
+        const full = el.dataset.full;
+        navigator.clipboard.writeText(full).then(function () {
+          const original = el.textContent;
+          el.textContent = 'copiado!';
+          setTimeout(() => { el.textContent = original; }, 1000);
+        });
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  renderSession();
+})();
+</script>
+
+</body>
+</html>
