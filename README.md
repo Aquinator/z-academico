@@ -7,8 +7,8 @@ Projeto final de Engenharia de Software. Plataforma de gerenciamento acadêmico 
 ## Arquitetura
 
 ```
-┌──────────────────────────┐
-│   Frontend (estático)    │  index.html — painel de verificação
+┌───────────────────────────┐
+│   Frontend (estático)     │  index.html — painel de verificação
 └────────────┬──────────────┘
              │ HTTPS
       ┌──────▼───────┐
@@ -135,7 +135,7 @@ prometheus         Up (healthy)
 
 ### 5. Acessar os serviços
 
-| URL | Serviço |
+| Variável | Descrição |
 |---|---|
 | http://localhost:8080 | API Gateway (ponto de entrada) |
 | http://localhost:3001/health | Auth Service — health direto |
@@ -204,6 +204,18 @@ Acesso: `http://localhost:3000` — login `admin` / `admin`
 
 - **Health checks**: `GET /health` em todos os serviços, retornando `{ status, service, timestamp, uptime }`
 - **Logs estruturados**: JSON via Winston, com campo `service` para identificar origem e stack trace em erros
+
+---
+
+### 5. Acessar os serviços
+
+| URL | Serviço |
+|---|---|
+| http://localhost:8080 | API Gateway (ponto de entrada) |
+| http://localhost:3001/health | Auth Service — health direto |
+| http://localhost:3002/health | Academic Service — health direto |
+| http://localhost:9090/targets | Prometheus — targets ativos |
+| http://localhost:3000 | Grafana — dashboards (admin/admin) |
 
 ---
 
