@@ -4,7 +4,7 @@ Interface mínima de demonstração para o z-academico. Arquivo único (`index.h
 
 ## Por que essa abordagem
 
-O enunciado original do projeto não exigia frontend (o foco é DevOps: containerização, CI/CD, observabilidade). Este painel foi adicionado depois, como uma camada fina de visualização sobre as APIs já existentes — não para somar pontos de design, mas para tornar a demonstração mais tangível.
+O enunciado original do projeto não exigia frontend (o foco é DevOps: containerização, CI/CD, observabilidade). Este painel foi adicionado depois, como uma camada fina de visualização sobre as APIs já existentes.
 
 Por isso, a escolha técnica foi deliberadamente simples:
 - **1 arquivo HTML** com CSS e JS embutidos — zero risco de quebrar por dependência externa no dia da apresentação
@@ -44,5 +44,4 @@ Clique em **Salvar e verificar**. As bolinhas de status no topo (verde = online,
 
 - Não há edição/exclusão pela interface — só criação e listagem, suficiente para demonstrar o fluxo de ponta a ponta
 - Não há tratamento de CORS explícito do lado do frontend — depende do `cors()` já habilitado nos serviços Express
-- Os IDs de relacionamento (ex: `usuarioId` na criação de aluno) precisam ser copiados manualmente do retorno de outra chamada — aceitável para demonstração, não para uso real
 
