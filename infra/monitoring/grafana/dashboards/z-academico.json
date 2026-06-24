@@ -1,14 +1,14 @@
 {
   "title": "z-academico — Visão Geral",
   "uid": "z-academico-overview",
-  "version": 1,
+  "version": 2,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
     {
       "id": 1,
-      "title": "Requisições HTTP — auth-service (total/min)",
+      "title": "Requisições HTTP — auth-service (req/min)",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
@@ -35,6 +35,10 @@
       "title": "Tentativas de Login",
       "type": "stat",
       "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
       "targets": [
         {
           "expr": "auth_login_attempts_total",
@@ -47,6 +51,10 @@
       "title": "Usuários Registrados",
       "type": "stat",
       "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
       "targets": [
         {
           "expr": "auth_registered_users_total",
@@ -56,7 +64,7 @@
     },
     {
       "id": 5,
-      "title": "Requisições HTTP — academic-service (total/min)",
+      "title": "Requisições HTTP — academic-service (req/min)",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
       "targets": [
@@ -75,6 +83,24 @@
         {
           "expr": "histogram_quantile(0.99, rate(academic_http_request_duration_seconds_bucket[1m]))",
           "legendFormat": "p99 {{route}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Operações por Entidade — academic-service",
+      "description": "Total de requisições bem-sucedidas (2xx) agrupadas por rota, mostrando volume de uso de alunos, disciplinas e turmas.",
+      "type": "bargauge",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 4 },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "expr": "sum by (route) (increase(academic_http_requests_total{status_code=~\"2..\"}[1h]))",
+          "legendFormat": "{{route}}"
         }
       ]
     }

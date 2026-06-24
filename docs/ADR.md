@@ -52,7 +52,11 @@ PostgreSQL 16 Alpine. A constraint `UNIQUE` nativa trata matrículas duplicadas 
 ### Consequências
 - Banco separado por serviço (auth-db e academic-db) — isolamento real entre domínios
 - Healthcheck `pg_isready` garante que Node não sobe antes do banco estar pronto
+ feature/frontend-demo
 - Em produção, necessário provisionar banco gerenciado (ver ADR-005)
+=======
+- Em produção, necessário provisionar Render Postgres ou serviço externo
+ develop
 
 ---
 
@@ -75,6 +79,7 @@ O `academic-service` precisa validar identidade do usuário sem manter sessão p
 ### Decisão
 JWT com `jsonwebtoken`, expiração via `JWT_EXPIRES_IN` (padrão `7d`). O `academic-service` delega validação ao `auth-service` via `authClient.validateToken` — não valida o token diretamente.
 
+ feature/frontend-demo
 ### Por que essa decisão é central na arquitetura (importante para apresentação)
 
 O `academic-service` **não tem acesso ao `JWT_SECRET`**, de propósito. Isso significa que ele é incapaz de forjar ou validar um token sozinho — toda vez que precisa confirmar quem é o usuário, ele faz uma chamada HTTP real para `POST /auth/validate` no `auth-service`. Esse é o ponto exato onde os dois microsserviços "conversam": uma chamada síncrona, serviço-a-serviço, autenticada pelo próprio token que está sendo validado.
@@ -101,6 +106,12 @@ Cliente → academic-service (com JWT no header)
 - Cada validação de token no `academic-service` gera uma chamada de rede adicional ao `auth-service` — overhead aceito pelo ganho de isolamento de segredo
 - Revogação de tokens exige implementação de blocklist se necessário
 - **Acoplamento de disponibilidade**: se `auth-service` cair, `academic-service` não consegue validar tokens novos, retornando `503 AUTH_SERVICE_UNAVAILABLE` (ver `authClient.js`)
+=======
+### Consequências
+- Campo `tipo` no payload (`admin`, `professor`, `aluno`) habilita autorização por role sem consulta ao banco
+- `authMiddleware.js` é reutilizável em qualquer serviço futuro
+- Revogação de tokens exige implementação de blocklist se necessário
+ develop
 
 ---
 
@@ -120,12 +131,17 @@ Projeto desenvolvido por dupla com entregas avaliadas por sprint. Necessário ra
 | GitHub Flow | Simples, PR sempre em main | Sem branch de integração (develop) |
 
 ### Decisão
+ feature/frontend-demo
 Git Flow adaptado: `main` (produção, protegida), `develop` (integração, CI em todo push), `feature/*`, `fix/*`. Commits seguem Conventional Commits.
+=======
+Git Flow adaptado: `main` (produção, protegida), `develop` (integração, CI em todo push), `feature/*`, `release/*`, `hotfix/*`. Commits seguem Conventional Commits.
+ develop
 
 ### Consequências
 - CD dispara apenas em push para `main` — deploys são deliberados
 - Issues fechadas automaticamente via `Closes #N` nos commits
 - Histórico de commits documenta progresso sprint a sprint
+ feature/frontend-demo
 - **Nota de transparência:** as branches `feature/auth-service` e `feature/academic-service` do Sprint 1 foram, na prática, incorporadas direto em `develop`/`main` sem PR formal. A partir do Sprint 2, o fluxo de PR + review foi seguido rigorosamente (`feature/ci-pipeline`, `fix/ambiente-academic-service`, `feature/cd-deploy`)
 
 ---
@@ -133,6 +149,14 @@ Git Flow adaptado: `main` (produção, protegida), `develop` (integração, CI e
 ## ADR-005 — Plataforma de deploy em produção: Render → Railway
 
 **Data original:** Sprint 3 | **Status:** **Superado** (ver ADR-005-R)
+=======
+
+---
+
+## ADR-005 — Render como plataforma de deploy em produção
+
+**Data:** Sprint 3 | **Status:** Aceito
+ develop
 
 ### Contexto
 Necessário deploy de containers Docker com integração ao Docker Hub, plano gratuito funcional para demonstração e sem necessidade de configurar VPS manualmente.
@@ -141,12 +165,18 @@ Necessário deploy de containers Docker com integração ao Docker Hub, plano gr
 
 | Alternativa | Prós | Contras |
 |---|---|---|
+ feature/frontend-demo
 | Render | Docker nativo, deploy via webhook, Postgres gerenciado, plano free | Sleep após 15min de inatividade no plano free |
 | **Railway** | Interface moderna, deploy rápido, Postgres gerenciado integrado ao projeto | Plano free limitado, CLI exige verificação de pagamento |
+=======
+| **Render** | Docker nativo, deploy via webhook, Postgres gerenciado, plano free | Sleep após 15min de inatividade no plano free |
+| Railway | Interface moderna, deploy rápido | Plano free limitado a horas mensais |
+ develop
 | Fly.io | Performance, regiões globais | Curva de aprendizado maior, configuração via TOML |
 | VPS (DigitalOcean) | Controle total | Custo fixo mensal, fora do escopo |
 | Heroku | Familiar | Plano gratuito descontinuado em 2022 |
 
+ feature/frontend-demo
 ### Decisão original
 Render foi a escolha inicial. O fluxo "Deploy from Docker Hub" integraria com o `cd.yml` via API REST do Render.
 
@@ -231,3 +261,12 @@ Painel HTML estático de arquivo único (`frontend/index.html`), sem dependênci
 - Risco de falha técnica no dia da apresentação reduzido ao mínimo — não há `npm install`, build, ou versão de Node específica envolvida
 - Funcionalidade deliberadamente limitada: apenas criação e listagem (sem edição/exclusão pela UI), suficiente para demonstrar o fluxo de ponta a ponta entre os dois microsserviços
 - Campos de relacionamento (ex: `professorId` ao criar turma) são preenchidos via `<select>` populado dinamicamente pelas APIs reais, evitando a necessidade de copiar UUIDs manualmente durante a demonstração
+=======
+### Decisão
+Render. O fluxo "Deploy from Docker Hub" integra diretamente com o `cd.yml`: o workflow publica a imagem e aciona o Render via API REST. Render Postgres resolve banco em produção sem configuração adicional.
+
+### Consequências
+- Serviços entram em sleep após 15min no plano free — iniciar demonstração com ~2min de antecedência
+- Variáveis de ambiente configuradas na UI do Render, nunca commitadas no repositório
+- URLs no formato `https://z-academico-auth.onrender.com` devem ser adicionadas ao README após o primeiro deploy
+ develop
